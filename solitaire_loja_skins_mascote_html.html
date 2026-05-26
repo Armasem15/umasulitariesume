@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="pt-pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Impaciência.exe - Deluxe Edition</title>
+    <style>
+        :root {
+            --bg-table:
+            --card-back: repeating-linear-gradient(45deg, #000080 25%, transparent 25%, transparent 50%, #000080 50%, #000080 75%, transparent 75%, transparent);
+            --card-back-color: #0000a8;
+            --card-w: 85px;
+            --card-h: 125px;
+            --radius: 5px;
+            --gap: 15px;
+        }
+
+        @media (max-width: 768px) {
+            :root { --card-w: 42px; --card-h: 65px; --radius: 3px; --gap: 6px; }
+            .card .rank { font-size: 14px !important; }
+            .card .suit-mini { font-size: 10px !important; margin-top: -2px !important; }
+            .card .face-icon { font-size: 24px !important; }
+            .card .suit-main { font-size: 18px !important; bottom: 2px !important; right: 4px !important; }
+            #stock.empty { font-size: 20px !important; }
+            #game-board { padding: 10px !important; }
+            .menu-bar { font-size: 12px !important; padding: 3px 6px !important; flex-wrap: wrap; }
+        }
+
+        body { 
+            background-color: #c0c0c0; background-size: cover; background-position: center;
+            margin: 0; font-family: 'Tahoma', sans-serif; display: flex; flex-direction: column; height: 100vh; overflow: hidden;
+        }
+
+        /* Barras de Interface */
+        .title-bar { 
+            background: linear-gradient(90deg, #000080, #1084d0); color: white; padding: 4px 10px; font-weight: bold; 
+            display: flex; justify-content: space-between; border-bottom: 2px solid #fff; z-index: 10;
+        }
+        .menu-bar {
+            background: #c0c0c0; padding: 4px 10px; font-size: 14px; border-bottom: 2px solid #808080;
+            display: flex; gap: 15px; box-shadow: inset 1px 1px 0 #fff; align-items: center; z-index: 10;
+        }
+        .menu-item { cursor: pointer; padding: 2px 6px; color: black; user-select: none; }
+        .menu-item:hover { background: #000080; color: white; }
+        .status-panel { margin-left: auto; display: flex; gap: 15px; font-weight: bold; color: #000080; }
+
+        /* Tabuleiro e Cartas */
+        #game-board { background-color: var(--bg-table); flex-grow: 1; padding: 25px; position: relative; user-select: none; }
+        .row { display: flex; gap: var(--gap); margin-bottom: 25px; }
+        .slot { width: var(--card-w); height: var(--card-h); border: 2px solid rgba(0,0,0,0.3); border-radius: var(--radius); position: relative; box-sizing: border-box; }
+        
+        #stock { cursor: pointer; }
+        #stock.has-cards { background-color: var(--card-back-color); background-image: var(--card-back); background-size: cover; border: 2px solid #fff; }
+        #stock.empty { background: rgba(0,0,0,0.1); display: flex; align-items: center; justify-content: center; color: white; font-size: 40px; }
+
+        .card {
+            width: var(--card-w); height: var(--card-h); background: white; border: 1px solid black; border-radius: var(--radius);
+            position: absolute; box-sizing: border-box; padding: 4px; cursor: pointer; box-shadow: 2px 2px 4px rgba(0,0,0,0.4);
+        }
+        .card.selected { outline: 3px solid #ff0; box-shadow: 0 0 12px #ff0; transform: translateY(-5px); z-index: 9999 !important; }
+        .card.back { background-color: var(--card-back-color); background-image: var(--card-back); background-size: cover; border: 2px solid #fff; }
+        .card[data-color="red"] { color: #d00; }
+        .card .rank { font-size: 26px; font-weight: 900; display: block; line-height: 1; }
+        .card .suit-mini { font-size: 16px; margin-top: -3px; display: block; }
+        .card .face-icon { font-size: 45px; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.15; }
+        .card .suit-main { font-size: 32px; position: absolute; bottom: 5px; right: 8px; }
+
+        .tableau-pile { width: var(--card-w); min-height: var(--card-h); position: relative; }
+        .tableau-pile:empty { border: 2px dashed rgba(0,0,0,0.15); border-radius: var(--radius); height: var(--card-h); box-sizing: border-box; }
+        .dragging { opacity: 0.5; }
+
+        /* Mascote */
+        #mascot-container {
+            position: fixed; bottom: 20px; right: 20px; width: 120px; height: 120px; z-index: 100;
+            transition: transform 0.2s; pointer-events: none; /* Para não atrapalhar o clique nas cartas */
+        }
+        #mascot-img { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(2px 2px 5px rgba(0,0,0,0.5)); }
+
+        /* Loja Modal */
+        #store-modal {
+            display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 80%; max-width: 600px; background: #c0c0c0; border: 2px solid; border-color: #fff #808080 #808080 #fff;
+            box-shadow: 5px 5px 15px rgba(0,0,0,0.5); z-index: 1000; padding: 2px;
+        }
+        .store-header { background: #000080; color: white; padding: 5px 10px; font-weight: bold; display: flex; justify-content: space-between; }
+        .store-close { cursor: pointer; background: #c0c0c0; color: black; border: 1px solid #fff; border-bottom-color: #808080; border-right-color: #808080; padding: 0 5px; font-weight: bold; }
+        .store-body { padding: 15px; max-height: 400px; overflow-y: auto; }
+        .store-category { margin-bottom: 20px; }
+        .store-category h3 { margin-top: 0; border-bottom: 1px solid #808080; }
+        .store-items { display: flex; gap: 10px; flex-wrap: wrap; }
+        .store-item { 
+            background: #e0e0e0; border: 2px solid #808080; padding: 10px; text-align: center; width: 120px; 
+            display: flex; flex-direction: column; align-items: center; border-radius: 5px;
+        }
+        .store-item img { width: 60px; height: 60px; object-fit: cover; margin-bottom: 5px; border: 1px solid #000; }
+        .store-item button { margin-top: auto; cursor: pointer; padding: 5px; width: 100%; font-weight: bold; }
+        .store-item button:disabled { color: green; cursor: default; }
+
+        /* Overlay */
+        #overlay { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.5); z-index: 999; }
+    </style>
+</head>
+<body>
+
+    <div class="title-bar">
+        <span>Impaciência.exe - Deluxe</span>
+        <span>_ □ X</span>
+    </div>
+
+    <div class="menu-bar">
+        <div class="menu-item" onclick="game.init()">Jogo Novo</div>
+        <div class="menu-item" onclick="game.undo()">Desfazer</div>
+        <div class="menu-item" onclick="loja.abrir()">🛒 Loja de Skins</div>
+        <div class="menu-item" onclick="audio.toggleMusica()">🎵 Música On/Off</div>
+        
+        <div class="status-panel">
+            <span>Pontos: <span id="pontos-display">0</span></span>
+        </div>
+    </div>
+
+    <div id="game-board">
+        <div class="row">
+            <div id="stock" class="slot" onclick="game.drawCard()"></div>
+            <div id="waste" class="slot"></div>
+            <div style="flex-grow: 1"></div>
+            <div class="slot foundation" data-suit="hearts"></div>
+            <div class="slot foundation" data-suit="diamonds"></div>
+            <div class="slot foundation" data-suit="clubs"></div>
+            <div class="slot foundation" data-suit="spades"></div>
+        </div>
+        <div class="row" id="tableau-row">
+            <div class="tableau-pile" data-idx="0"></div>
+            <div class="tableau-pile" data-idx="1"></div>
+            <div class="tableau-pile" data-idx="2"></div>
+            <div class="tableau-pile" data-idx="3"></div>
+            <div class="tableau-pile" data-idx="4"></div>
+            <div class="tableau-pile" data-idx="5"></div>
+            <div class="tableau-pile" data-idx="6"></div>
+        </div>
+    </div>
+
+    <div id="mascot-container">
+        <img id="mascot-img" src="" alt="Mascote">
+    </div>
+
+    <div id="overlay"></div>
+    <div id="store-modal">
+        <div class="store-header">
+            <span>Loja - Seus Pontos: <span id="loja-pontos">0</span></span>
+            <div class="store-close" onclick="loja.fechar()">X</div>
+        </div>
+        <div class="store-body" id="store-content">
+            </div>
+    </div>
+
+<script>
+    // ==========================================
+    // 1. CONFIGURAÇÃO DE ASSETS (SUAS IMAGENS E SONS)
+    // ==========================================
+    // Substitua os links em 'src' pelos URLs ou caminhos locais dos seus PNG/JPG/MP3
+    const ASSETS_DO_JOGO = {
+        audios: {
+            musicaFundo: 'https://cdn.pixabay.com/download/audio/2022/01/21/audio_31743c58bc.mp3?filename=chill-abstract-intention-11084.mp3', // Música relaxante
+            cartaMover: 'https://freesound.org/data/previews/240/240776_4107740-lq.mp3', // Som de carta
+            erro: 'https://freesound.org/data/previews/142/142608_1840019-lq.mp3', // Som de erro
+            sucesso: 'https://freesound.org/data/previews/270/270404_5123851-lq.mp3' // Som de ponto/fundação
+        },
+        fundos: [
+            { id: 'bg_verde', nome: 'Mesa Clássica', tipo: 'cor', valor: '#008000', preco: 0 },
+            { id: 'bg_madeira', nome: 'Mesa de Madeira', tipo: 'imagem', valor: 'url(https://i.pinimg.com/1200x/41/07/a0/4107a0ac106939bc75e2a81b8a0a4af6.jpg)', preco: 50 },
+            { id: 'bg_espaco', nome: 'Galáxia', tipo: 'imagem', valor: 'url(https://img.freepik.com/fotos-gratis/fundo-da-galaxia-com-estrelas_23-2148965934.jpg)', preco: 150 }
+        ],
+        cartas: [
+            { id: 'card_azul', nome: 'Retro Azul', tipo: 'cor', cor: '#0000a8', padrao: 'repeating-linear-gradient(45deg, #000080 25%, transparent 25%, transparent 50%, #000080 50%, #000080 75%, transparent 75%, transparent)', preco: 0 },
+            { id: 'card_vermelha', nome: 'Retro Vermelha', tipo: 'cor', cor: '#a80000', padrao: 'repeating-linear-gradient(45deg, #800000 25%, transparent 25%, transparent 50%, #800000 50%, #800000 75%, transparent 75%, transparent)', preco: 30 },
+            { id: 'card_ouro', nome: 'Ouro Puro', tipo: 'imagem', cor: '#ffd700', padrao: 'url(https://i.pinimg.com/736x/22/c8/b5/22c8b5d2395eaf76fa38559967db7454.jpg)', preco: 200 }
+        ],
+        mascotes: [
+            { 
+                id: 'mascote_gato', nome: 'Gatinho Pixel', preco: 0,
+                // Aqui você coloca os links para as 4 emoções do mascote
+                estados: {
+                    neutra: 'https://cdn-icons-png.flaticon.com/128/616/616430.png',
+                    boa: 'https://cdn-icons-png.flaticon.com/128/616/616408.png',
+                    ruim: 'https://cdn2.cdnstep.com/T2BSJAQHrJQquqqy7ZYj/cover-1.thumb256.png',
+                    feliz: 'https://cdn-icons-png.flaticon.com/128/616/616405.png'
+                }
+            },
+            { 
+                id: 'mascote_dog', nome: ' agnes tachyon', preco: 100,
+                estados: {
+                    neutra: 'https://img1.picmix.com/output/stamp/normal/4/7/7/1/2851774_d9a27.gif',
+                    boa: 'https://media.tenor.com/xWQmpYFE_4sAAAAj/sticker-agnes-tachyon.gif',
+                    ruim: 'https://cdn2.cdnstep.com/T2BSJAQHrJQquqqy7ZYj/cover-1.thumb256.png',
+                    feliz: 'https://media.tenor.com/xWQmpYFE_4sAAAAj/sticker-agnes-tachyon.gif'
+                }
+            }
+        ]
+    };
+
+    // ==========================================
+    // 2. SISTEMA DE ÁUDIO
+    // ==========================================
+    const audio = {
+        bgm: new Audio(ASSETS_DO_JOGO.audios.musicaFundo),
+        mover: new Audio(ASSETS_DO_JOGO.audios.cartaMover),
+        erro: new Audio(ASSETS_DO_JOGO.audios.erro),
+        sucesso: new Audio(ASSETS_DO_JOGO.audios.sucesso),
+        musicaAtiva: false,
+
+        init() { this.bgm.loop = true; this.bgm.volume = 0.3; },
+        tocar(som) { if(this[som]) { this[som].currentTime = 0; this[som].play().catch(e => console.log('Áudio bloqueado pelo navegador')); } },
+        toggleMusica() {
+            this.musicaAtiva = !this.musicaAtiva;
+            if(this.musicaAtiva) { this.bgm.play().catch(e=>console.log(e)); } 
+            else { this.bgm.pause(); }
+        }
+    };
+    audio.init();
+
+    // ==========================================
+    // 3. SISTEMA DO MASCOTE
+    // ==========================================
+    const mascote = {
+        elemento: document.getElementById('mascot-img'),
+        timeoutId: null,
+        
+        reagir(estado) { // 'neutra', 'boa', 'ruim', 'feliz'
+            const skinIdAtiva = localStorage.getItem('equipado_mascotes') || 'mascote_gato';
+            const skin = ASSETS_DO_JOGO.mascotes.find(m => m.id === skinIdAtiva);
+            
+            this.elemento.src = skin.estados[estado];
+            
+            // Animação de pulo
+            if(estado === 'feliz') {
+                this.elemento.parentElement.style.transform = 'translateY(-20px)';
+                setTimeout(() => this.elemento.parentElement.style.transform = 'translateY(0)', 200);
+            }
+
+            clearTimeout(this.timeoutId);
+            if(estado !== 'neutra') {
+                this.timeoutId = setTimeout(() => this.reagir('neutra'), 2000); // Volta ao normal em 2s
+            }
+        }
+    };
+
+    // ==========================================
+    // 4. SISTEMA DE LOJA E PONTOS
+    // ==========================================
+    const loja = {
+        pontos: parseInt(localStorage.getItem('solitaire_pontos')) || 0,
+        inventario: JSON.parse(localStorage.getItem('solitaire_inventario')) || {
+            fundos: ['bg_verde'], cartas: ['card_azul'], mascotes: ['mascote_gato']
+        },
+
+        ganharPontos(qtd) {
+            this.pontos += qtd;
+            if(this.pontos < 0) this.pontos = 0;
+            localStorage.setItem('solitaire_pontos', this.pontos);
+            document.getElementById('pontos-display').innerText = this.pontos;
+            if(document.getElementById('loja-pontos')) document.getElementById('loja-pontos').innerText = this.pontos;
+        },
+
+        comprar(categoria, id, preco) {
+            if(this.pontos >= preco) {
+                this.ganharPontos(-preco);
+                this.inventario[categoria].push(id);
+                localStorage.setItem('solitaire_inventario', JSON.stringify(this.inventario));
+                this.equipar(categoria, id);
+                audio.tocar('sucesso');
+                this.renderizarLoja();
+            } else {
+                audio.tocar('erro');
+                alert("Pontos insuficientes!");
+            }
+        },
+
+        equipar(categoria, id) {
+            localStorage.setItem('equipado_' + categoria, id);
+            this.aplicarVisuais();
+            this.renderizarLoja();
+        },
+
+        aplicarVisuais() {
+            // Aplica o Fundo
+            const bgId = localStorage.getItem('equipado_fundos') || 'bg_verde';
+            const bg = ASSETS_DO_JOGO.fundos.find(f => f.id === bgId);
+            if(bg.tipo === 'cor') document.body.style.background = bg.valor;
+            else document.body.style.background = `${bg.valor} center/cover`;
+
+            // Aplica Costas da Carta
+            const cardId = localStorage.getItem('equipado_cartas') || 'card_azul';
+            const card = ASSETS_DO_JOGO.cartas.find(c => c.id === cardId);
+            document.documentElement.style.setProperty('--card-back-color', card.cor);
+            document.documentElement.style.setProperty('--card-back', card.padrao);
+
+            // Aplica Mascote
+            mascote.reagir('neutra');
+            document.getElementById('pontos-display').innerText = this.pontos;
+        },
+
+        abrir() {
+            this.renderizarLoja();
+            document.getElementById('store-modal').style.display = 'block';
+            document.getElementById('overlay').style.display = 'block';
+        },
+        fechar() {
+            document.getElementById('store-modal').style.display = 'none';
+            document.getElementById('overlay').style.display = 'none';
+        },
+
+        renderizarLoja() {
+            document.getElementById('loja-pontos').innerText = this.pontos;
+            const content = document.getElementById('store-content');
+            content.innerHTML = '';
+
+            const criarSessao = (titulo, categoriaKey, arrayDados, thumbProp) => {
+                let html = `<div class="store-category"><h3>${titulo}</h3><div class="store-items">`;
+                const equipado = localStorage.getItem('equipado_' + categoriaKey) || arrayDados[0].id;
+
+                arrayDados.forEach(item => {
+                    const comprado = this.inventario[categoriaKey].includes(item.id);
+                    const isEquipado = equipado === item.id;
+                    
+                    let imgSrc = item[thumbProp];
+                    if(categoriaKey === 'fundos' && item.tipo==='cor') imgSrc = 'https://via.placeholder.com/60/'+item.valor.replace('#','')+'/'+item.valor.replace('#','');
+                    if(categoriaKey === 'mascotes') imgSrc = item.estados.feliz;
+                    if(categoriaKey === 'cartas' && item.tipo==='cor') imgSrc = 'https://via.placeholder.com/60/'+item.cor.replace('#','')+'/'+item.cor.replace('#','');
+                    if(item.tipo === 'imagem' || item.padrao?.includes('url')) imgSrc = item.valor ? item.valor.slice(4,-1) : item.padrao.slice(4,-1);
+
+                    html += `
+                        <div class="store-item">
+                            <img src="${imgSrc}" alt="${item.nome}">
+                            <span style="font-size:12px; font-weight:bold">${item.nome}</span>
+                            <span style="font-size:12px">${precoTxt(item.preco, comprado)}</span>
+                            ${isEquipado ? `<button disabled>Equipado</button>` : 
+                              comprado ? `<button onclick="loja.equipar('${categoriaKey}', '${item.id}')">Usar</button>` : 
+                              `<button onclick="loja.comprar('${categoriaKey}', '${item.id}', ${item.preco})">Comprar</button>`}
+                        </div>`;
+                });
+                html += `</div></div>`;
+                content.innerHTML += html;
+            };
+
+            const precoTxt = (preco, comprado) => comprado ? "✔ Adquirido" : `💎 ${preco} pts`;
+
+            criarSessao('Fundos de Mesa', 'fundos', ASSETS_DO_JOGO.fundos, 'valor');
+            criarSessao('Costas das Cartas', 'cartas', ASSETS_DO_JOGO.cartas, 'padrao');
+            criarSessao('Mascotes', 'mascotes', ASSETS_DO_JOGO.mascotes, 'estados');
+        }
+    };
+
+    // ==========================================
+    // 5. LÓGICA DO SOLITÁRIO (Com pontos e reações)
+    // ==========================================
+    const SYMBOLS = { hearts: '♥', diamonds: '♦', clubs: '♣', spades: '♠' };
+    const FACE_ICONS = { 11: '⚔️', 12: '👑', 13: '♚' };
+
+    class Card {
+        constructor(suit, value, isFaceUp = false) {
+            this.suit = suit; this.value = value; this.isFaceUp = isFaceUp;
+            this.color = (suit === 'hearts' || suit === 'diamonds') ? 'red' : 'black';
+        }
+        getLabel() {
+            if (this.value === 1) return 'A';
+            if (this.value === 11) return 'J';
+            if (this.value === 12) return 'Q';
+            if (this.value === 13) return 'K';
+            return this.value;
+        }
+    }
+
+    class Solitaire {
+        constructor() {
+            this.history = []; this.selectedCardLoc = null;
+        }
+
+        init() {
+            this.stock = []; this.waste = []; this.tableau = Array.from({ length: 7 }, () => []);
+            this.foundations = { hearts: [], diamonds: [], clubs: [], spades: [] };
+            this.history = []; this.selectedCardLoc = null;
+
+            let deck = [];
+            Object.keys(SYMBOLS).forEach(s => { for (let v = 1; v <= 13; v++) deck.push(new Card(s, v)); });
+
+            for (let i = deck.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [deck[i], deck[j]] = [deck[j], deck[i]];
+            }
+
+            for (let i = 0; i < 7; i++) {
+                for (let j = 0; j <= i; j++) {
+                    let card = deck.pop();
+                    if (j === i) card.isFaceUp = true;
+                    this.tableau[i].push(card);
+                }
+            }
+            this.stock = deck;
+            this.render();
+            mascote.reagir('neutra');
+        }
+
+        saveState() {
+            const deepCloneCard = (c) => new Card(c.suit, c.value, c.isFaceUp);
+            const snapshot = {
+                stock: this.stock.map(deepCloneCard), waste: this.waste.map(deepCloneCard),
+                foundations: {
+                    hearts: this.foundations.hearts.map(deepCloneCard), diamonds: this.foundations.diamonds.map(deepCloneCard),
+                    clubs: this.foundations.clubs.map(deepCloneCard), spades: this.foundations.spades.map(deepCloneCard)
+                },
+                tableau: this.tableau.map(pile => pile.map(deepCloneCard))
+            };
+            this.history.push(snapshot);
+        }
+
+        undo() {
+            if (this.history.length === 0) {
+                audio.tocar('erro'); mascote.reagir('ruim'); return;
+            }
+            const previousState = this.history.pop();
+            this.stock = previousState.stock; this.waste = previousState.waste;
+            this.foundations = previousState.foundations; this.tableau = previousState.tableau;
+            this.selectedCardLoc = null;
+            loja.ganharPontos(-2); // Penalidade leve por desfazer
+            audio.tocar('mover');
+            this.render();
+        }
+
+        drawCard() {
+            this.selectedCardLoc = null;
+            if (this.stock.length > 0 || this.waste.length > 0) {
+                this.saveState();
+                if (this.stock.length > 0) {
+                    const card = this.stock.pop(); card.isFaceUp = true; this.waste.push(card);
+                    audio.tocar('mover');
+                } else {
+                    this.stock = [...this.waste].reverse().map(c => { c.isFaceUp = false; return c; });
+                    this.waste = [];
+                    audio.tocar('mover');
+                }
+                this.render();
+            }
+        }
+
+        handleCardClick(loc, event) {
+            event.stopPropagation();
+            if (!this.selectedCardLoc) {
+                this.selectedCardLoc = loc; this.render(); return;
+            }
+            if (this.isSameLocation(this.selectedCardLoc, loc)) {
+                this.selectedCardLoc = null; this.render(); return;
+            }
+            let target = { type: loc.type };
+            if (loc.type === 'tableau') target.idx = loc.idx;
+            if (loc.type === 'foundation') target.suit = loc.suit;
+
+            this.moveCards(this.selectedCardLoc, target);
+            this.selectedCardLoc = null;
+        }
+
+        isSameLocation(loc1, loc2) {
+            return loc1.type === loc2.type && loc1.idx === loc2.idx && loc1.cardIdx === loc2.cardIdx && loc1.suit === loc2.suit;
+        }
+
+        moveCards(source, target) {
+            let srcArr = this.getPileArray(source);
+            if (!srcArr || srcArr.length === 0) return;
+            if (target.type === 'foundation' && source.cardIdx !== srcArr.length - 1) {
+                audio.tocar('erro'); mascote.reagir('ruim'); return;
+            }
+
+            let cardsToMove = srcArr.slice(source.cardIdx);
+
+            if (this.isValidMove(cardsToMove[0], target)) {
+                this.saveState();
+                srcArr.splice(source.cardIdx);
+                let destArr = this.getPileArray(target);
+                destArr.push(...cardsToMove);
+                
+                // Sistema de Pontos e Reações
+                if(target.type === 'foundation') {
+                    loja.ganharPontos(15);
+                    audio.tocar('sucesso');
+                    mascote.reagir('feliz');
+                } else {
+                    loja.ganharPontos(5);
+                    audio.tocar('mover');
+                    mascote.reagir('boa');
+                }
+
+                // Virar a próxima carta do tableau dá pontos extra
+                if (srcArr.length > 0 && !srcArr[srcArr.length - 1].isFaceUp) {
+                    srcArr[srcArr.length - 1].isFaceUp = true;
+                    loja.ganharPontos(5);
+                }
+                this.render();
+            } else {
+                audio.tocar('erro');
+                mascote.reagir('ruim');
+                this.render();
+            }
+        }
+
+        isValidMove(card, target) {
+            let destArr = this.getPileArray(target);
+            let top = destArr.length > 0 ? destArr[destArr.length - 1] : null;
+
+            if (target.type === 'tableau') {
+                if (!top) return card.value === 13;
+                return (card.color !== top.color) && (card.value === top.value - 1);
+            }
+            if (target.type === 'foundation') {
+                if (!top) return card.value === 1 && card.suit === target.suit;
+                return (card.suit === top.suit) && (card.value === top.value + 1);
+            }
+            return false;
+        }
+
+        getPileArray(loc) {
+            if (loc.type === 'tableau') return this.tableau[loc.idx];
+            if (loc.type === 'waste') return this.waste;
+            if (loc.type === 'foundation') return this.foundations[loc.suit];
+        }
+
+        render() {
+            const stockEl = document.getElementById('stock');
+            stockEl.className = this.stock.length > 0 ? 'slot has-cards' : 'slot empty';
+            stockEl.innerHTML = this.stock.length === 0 ? '↺' : '';
+
+            const wasteEl = document.getElementById('waste'); wasteEl.innerHTML = '';
+            if (this.waste.length > 0) wasteEl.appendChild(this.createCardEl(this.waste[this.waste.length - 1], {type: 'waste', cardIdx: this.waste.length-1}));
+
+            document.querySelectorAll('.foundation').forEach(f => {
+                f.innerHTML = ''; const suit = f.dataset.suit;
+                this.foundations[suit].forEach((c, idx) => f.appendChild(this.createCardEl(c, {type: 'foundation', suit: suit, cardIdx: idx})));
+            });
+
+            document.querySelectorAll('.tableau-pile').forEach((p, i) => {
+                p.innerHTML = '';
+                this.tableau[i].forEach((c, j) => {
+                    const el = this.createCardEl(c, {type: 'tableau', idx: i, cardIdx: j});
+                    el.style.top = (j * (window.innerWidth <= 768 ? 14 : 25)) + 'px';
+                    p.appendChild(el);
+                });
+            });
+        }
+
+        createCardEl(card, loc) {
+            const div = document.createElement('div');
+            div.className = 'card' + (card.isFaceUp ? '' : ' back');
+            
+            if (this.selectedCardLoc && this.isSameLocation(this.selectedCardLoc, loc)) div.classList.add('selected');
+
+            if (card.isFaceUp) {
+                div.dataset.color = card.color;
+                div.draggable = true;
+                div.innerHTML = `<span class="rank">${card.getLabel()}</span><span class="suit-mini">${SYMBOLS[card.suit]}</span>${FACE_ICONS[card.value] ? `<div class="face-icon">${FACE_ICONS[card.value]}</div>` : ''}<span class="suit-main">${SYMBOLS[card.suit]}</span>`;
+                div.onclick = (e) => this.handleCardClick(loc, e);
+                div.ondragstart = (e) => {
+                    this.selectedCardLoc = null;
+                    e.dataTransfer.setData('json', JSON.stringify(loc));
+                    setTimeout(() => div.classList.add('dragging'), 0);
+                };
+                div.ondragend = () => div.classList.remove('dragging');
+            }
+            return div;
+        }
+    }
+
+    // Inicialização
+    const game = new Solitaire();
+    loja.aplicarVisuais(); // Carrega os visuais salvos na inicialização
+    game.init();
+
+    // Eventos Drag&Drop Refeitos
+    document.getElementById('game-board').ondragover = e => e.preventDefault();
+    document.getElementById('game-board').ondrop = e => {
+        e.preventDefault();
+        try {
+            const dataStr = e.dataTransfer.getData('json');
+            if (!dataStr) return;
+            const source = JSON.parse(dataStr);
+
+            const tableauPile = e.target.closest('.tableau-pile');
+            if (tableauPile) return game.moveCards(source, { type: 'tableau', idx: parseInt(tableauPile.dataset.idx) });
+
+            const foundationPile = e.target.closest('.foundation');
+            if (foundationPile) return game.moveCards(source, { type: 'foundation', suit: foundationPile.dataset.suit });
+            
+            // Se caiu num lugar inválido
+            audio.tocar('erro'); mascote.reagir('ruim');
+        } catch (err) {}
+    };
+</script>
+</body>
+</html>
